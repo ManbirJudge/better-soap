@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BetterSoap</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            max-width: 100vw;
+        }
+
+        * {
+            font-family: sans-serif;
+        }
+
+        #container {
+            max-width: 900px;
+            margin: auto;
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.5rem;
+        }
+
+        h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        h2 {
+            margin: 0;
+            padding: 0;
+            font-size: 1.25rem;
+        }
+
+        p {
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        a {
+            text-decoration: none;
+            color: blue;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            color: blueviolet;
+        }
+
+        button.active {
+            filter: invert(1);
+            font-weight: bold;
+        }
+
+        #url-container {
+            display: flex;
+            flex-direction: row;
+            gap: 0.2rem;
+        }
+        
+        #url-container > input, #url-container > button {
+            padding: 0.2rem 0.4rem;
+        }
+
+        #vid-iframe {
+            aspect-ratio: 16 / 9;
+            border: 0;
+            background-color: brown;
+        }
+
+        #controls-container {
+            display: flex;
+            flex-direction: row;
+            gap: 0.5rem;
+        }
+
+        #servers-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        #servers-container button {
+            width: 5rem;
+            height: 2rem;
+        }
+
+        #episodes-container {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-content: start;
+            gap: 0.2rem;
+        } 
+        
+        #episodes-container button {
+            width: 2rem;
+            height: 2rem;
+        }
+
+        #url-in {
+            flex: 1;
+        }
+    </style>
+    <script>
+        let server = -1;
+        let ep = -1;
+
+        function fashHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = (hash << 5) - hash + char;
+                hash |= 0;
+            }
+            return (hash >>> 0).toString(16);
+        }
+    </script>
+</head>
+<body>
+    <div id="container">
+        <h1>BetterSoap</h1>
+        <div id="url-container">
+            <input id="url-in" type="url" placeholder="Enter Soap2DayHDZ URL here ...">
+            <button id="load-btn" type="submit">Load</button>
+        </div>
+        <iframe id="vid-iframe" allowfullscreen></iframe>
+        <h2 id="vid-title"></h2>
+        <div id="controls-container">
+            <div id="servers-container"></div>
+            <div id="episodes-container"></div>
+        </div>
+        <p>Made with ❤️ by <a href="https://github.com/ManbirJudge" target="_blank">Manbir Judge</a></p>
+    </div>
+    <script>
+        const loadBtn = document.getElementById("load-btn");
+        const urlIn = document.getElementById("url-in");
+        const vidIframe = document.getElementById("vid-iframe");
+        const vidTitle = document.getElementById("vid-title");
+        const serversContainer = document.getElementById("servers-container");
+        const episodesContainer = document.getElementById("episodes-container");
+
+        function reloadVid() {
+            localStorage.setItem("server", server);
+            localStorage.setItem(`${urlIn.value}-ep`, ep);
+
+            fetch(`./api/iframe?url=${encodeURIComponent(urlIn.value)}&server=${server}&ep=${ep}`).then(res => res.json()).then(res => {
+                const json = JSON.parse(res);
+                vidIframe.setAttribute("src", json.iframeUrl);
+            }).catch(e => {
+                console.log("Error:", e);
+            });
+        }
+
+        loadBtn.addEventListener("click", evt => {
+            fetch(`./api/info?url=${encodeURIComponent(urlIn.value)}`).then(res => res.json()).then(res => {
+                const info = JSON.parse(res);
+
+                const storedServer = parseInt(localStorage.getItem("server"));
+                const storedEp = parseInt(localStorage.getItem(`${urlIn.value}-ep`));
+
+                server = (storedServer && info.servers.includes(storedServer)) ? storedServer : info.servers[0];
+                ep = (storedEp && info.episodes.includes(storedEp)) ? storedEp : info.episodes[0];
+
+                vidTitle.innerText = info.title;
+                serversContainer.innerHTML = info.servers.map(srv => `<button data-type="server" data-id="${srv}" ${server == srv && "class=\"active\""}>Server ${srv}</button>`).join("");
+                episodesContainer.innerHTML = info.episodes.map(e => `<button data-type="ep" data-id="${e}" ${e == ep && "class=\"active\""}>${e}</button>`).join("");
+
+                reloadVid();
+            }).catch(e => {
+                console.log("Error:", e);
+            });
+        });
+
+        document.addEventListener('click', evt => {
+            const btn = evt.target.closest('button');
+            if (!btn) return;
+
+            const { type, id } = btn.dataset;
+
+            if (type && id) {
+                if (type === "server") {
+                    server = parseInt(id);
+                    serversContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add("active");
+                } else if (type === "ep") {
+                    ep = parseInt(id);
+                    episodesContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add("active");
+                }
+                reloadVid();
+            }
+        });
+    </script>
+</body>
+</html>

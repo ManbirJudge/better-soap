@@ -1,0 +1,5 @@
+ffmpeg/
+test/
+node_modules/
+stream/
+pnpm-lock.yaml
