@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A better version of Soap2DayHDZ">
     <title>BetterSoap</title>
     <style>
         body, html {
@@ -13,6 +14,10 @@
 
         * {
             font-family: sans-serif;
+        }
+
+        .hidden {
+            display: none !important;
         }
 
         #container {
@@ -46,12 +51,16 @@
 
         a {
             text-decoration: none;
-            color: blue;
+            color: inherit;
+            text-decoration: underline;
         }
 
         a:hover {
-            text-decoration: underline;
-            color: blueviolet;
+            text-decoration: underline double;
+        }
+
+        button {
+            cursor: pointer;
         }
 
         button.active {
@@ -69,10 +78,28 @@
             padding: 0.2rem 0.4rem;
         }
 
-        #vid-iframe {
+        #vid-player-container {
+            position: relative;
             aspect-ratio: 16 / 9;
-            border: 0;
-            background-color: brown;
+            background-color: darkslategray;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #vid-player {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #vid-loader {
+            position: absolute;
+            z-index: 2;
         }
 
         #controls-container {
@@ -106,6 +133,17 @@
             height: 2rem;
         }
 
+        #loader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #loader > svg, #vid-loader > svg {
+            width: 4rem;
+            height: 4rem;
+        }
+
         #url-in {
             flex: 1;
         }
@@ -113,8 +151,11 @@
     <script>
         let server = -1;
         let ep = -1;
+        let loading = false;
+        let loadingVid = false;
+        let titleHash = "";
 
-        function fashHash(str) {
+        function fastHash(str) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 const char = str.charCodeAt(i);
@@ -126,41 +167,98 @@
     </script>
 </head>
 <body>
-    <div id="container">
+    <main id="container">
         <h1>BetterSoap</h1>
         <div id="url-container">
             <input id="url-in" type="url" placeholder="Enter Soap2DayHDZ URL here ...">
             <button id="load-btn" type="submit">Load</button>
         </div>
-        <iframe id="vid-iframe" allowfullscreen></iframe>
-        <h2 id="vid-title"></h2>
-        <div id="controls-container">
+        <div id="loader" class="hidden">
+            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" stroke="black">
+                <g fill="none" fill-rule="evenodd">
+                    <g transform="translate(2 2)" stroke-width="4">
+                    <circle stroke-opacity=".25" cx="18" cy="18" r="18"/>
+                    <path d="M36 18c0-9.94-8.06-18-18-18">
+                        <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite"/>
+                    </path>
+                    </g>
+                </g>
+            </svg>
+        </div>
+        <div id="vid-player-container" class="hidden">
+            <div id="vid-loader" class="hidden">
+                <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" stroke="white">
+                    <g fill="none" fill-rule="evenodd">
+                        <g transform="translate(2 2)" stroke-width="4">
+                        <circle stroke-opacity=".25" cx="18" cy="18" r="18"/>
+                        <path d="M36 18c0-9.94-8.06-18-18-18">
+                            <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite"/>
+                        </path>
+                        </g>
+                    </g>
+                </svg>
+            </div>
+            <iframe id="vid-player" title="Video player" allowfullscreen frameborder="0"></iframe>
+        </div>
+        <h2 id="vid-title" class="hidden" ></h2>
+        <div id="controls-container" class="hidden">
             <div id="servers-container"></div>
             <div id="episodes-container"></div>
         </div>
-        <p>Made with ❤️ by <a href="https://github.com/ManbirJudge" target="_blank">Manbir Judge</a></p>
-    </div>
+        <p>Made with ❤️ by <a href="https://github.com/ManbirJudge" target="_blank">Manbir Judge</a> &bull; <a href="https://github.com/ManbirJudge/better-soap" target="_blank">GitHub</a></p>
+    </main>
     <script>
         const loadBtn = document.getElementById("load-btn");
         const urlIn = document.getElementById("url-in");
-        const vidIframe = document.getElementById("vid-iframe");
+        const loader = document.getElementById("loader");
+        const vidPlayerCont = document.getElementById("vid-player-container");
+        const vidLoader = document.getElementById("vid-loader");
+        const vidPlayer = document.getElementById("vid-player");
         const vidTitle = document.getElementById("vid-title");
         const serversContainer = document.getElementById("servers-container");
         const episodesContainer = document.getElementById("episodes-container");
 
+        const vidRelElements = [vidPlayerCont, vidTitle, document.getElementById("controls-container")]
+
         function reloadVid() {
+            if (loadingVid) return;
+            loadingVid = true;
+
+            if (server < 0 || ep < 0) return;
+
+            loadBtn.disabled = true;
+            urlIn.disabled = true;
+            vidLoader.classList.remove("hidden");
+            vidPlayer.classList.add("hidden");
+
             localStorage.setItem("server", server);
             localStorage.setItem(`${urlIn.value}-ep`, ep);
 
             fetch(`./api/iframe?url=${encodeURIComponent(urlIn.value)}&server=${server}&ep=${ep}`).then(res => res.json()).then(res => {
                 const json = JSON.parse(res);
-                vidIframe.setAttribute("src", json.iframeUrl);
+
+                vidPlayer.setAttribute("src", json.iframeUrl);
             }).catch(e => {
                 console.log("Error:", e);
+            }).finally(() => {
+                loadBtn.disabled = false;
+                urlIn.disabled = false;
+                vidLoader.classList.add("hidden");
+                vidPlayer.classList.remove("hidden");
+
+                loadingVid = false;
             });
         }
 
         loadBtn.addEventListener("click", evt => {
+            if (loading) return;
+            loading = true;
+
+            loadBtn.disabled = true;
+            urlIn.disabled = true;
+            loader.classList.remove("hidden");
+            vidRelElements.forEach(ele => ele.classList.add("hidden"));
+
             fetch(`./api/info?url=${encodeURIComponent(urlIn.value)}`).then(res => res.json()).then(res => {
                 const info = JSON.parse(res);
 
@@ -174,9 +272,18 @@
                 serversContainer.innerHTML = info.servers.map(srv => `<button data-type="server" data-id="${srv}" ${server == srv && "class=\"active\""}>Server ${srv}</button>`).join("");
                 episodesContainer.innerHTML = info.episodes.map(e => `<button data-type="ep" data-id="${e}" ${e == ep && "class=\"active\""}>${e}</button>`).join("");
 
-                reloadVid();
+                vidRelElements.forEach(ele => ele.classList.remove("hidden"));
             }).catch(e => {
+                server, ep = -1, -1;
+
                 console.log("Error:", e);
+            }).finally(() => {
+                loadBtn.disabled = false;
+                urlIn.disabled = false;
+                loader.classList.add("hidden");
+
+                loading = false;
+                reloadVid();
             });
         });
 
