@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A better version of Soap2DayHDZ">
+    <meta name="description" content="A better version of Soap2DayHDZ.">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <title>BetterSoap</title>
     <style>
         body, html {
@@ -56,16 +57,19 @@
         }
 
         a:hover {
-            text-decoration: underline double;
+            color: #337AB7;
         }
 
         button {
             cursor: pointer;
+            transition: all 0.1s ease;
         }
 
         button.active {
-            filter: invert(1);
+            color: #337AB7;
             font-weight: bold;
+            border-radius: 20px;
+            border-width: 0;
         }
 
         #url-container {
@@ -81,7 +85,7 @@
         #vid-player-container {
             position: relative;
             aspect-ratio: 16 / 9;
-            background-color: darkslategray;
+            background-color: #337AB7;
 
             display: flex;
             align-items: center;
@@ -97,7 +101,7 @@
             z-index: 1;
         }
 
-        #vid-loader {
+        #vid-spinner {
             position: absolute;
             z-index: 2;
         }
@@ -133,15 +137,25 @@
             height: 2rem;
         }
 
-        #loader {
+        #spinner {
             display: flex;
             align-items: center;
             justify-content: center;
         }
         
-        #loader > svg, #vid-loader > svg {
+        #spinner > svg, #vid-spinner > svg {
             width: 4rem;
             height: 4rem;
+        }
+
+        .spinner-path {
+            transform-origin: 18px 18px; 
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         #url-in {
@@ -153,7 +167,6 @@
         let ep = -1;
         let loading = false;
         let loadingVid = false;
-        let titleHash = "";
 
         function fastHash(str) {
             let hash = 0;
@@ -170,35 +183,40 @@
     <main id="container">
         <h1>BetterSoap</h1>
         <div id="url-container">
+            <select id="recent-select" style="width: 4.5rem; cursor: pointer;">
+                <option disabled selected hidden id="recent-select-lbl">Recents</option>
+            </select>
             <input id="url-in" type="url" placeholder="Enter Soap2DayHDZ URL here ...">
             <button id="load-btn" type="submit">Load</button>
         </div>
-        <div id="loader" class="hidden">
-            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" stroke="black">
+        <div id="spinner" class="hidden">
+            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" stroke="#337AB7">
                 <g fill="none" fill-rule="evenodd">
                     <g transform="translate(2 2)" stroke-width="4">
-                    <circle stroke-opacity=".25" cx="18" cy="18" r="18"/>
-                    <path d="M36 18c0-9.94-8.06-18-18-18">
-                        <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite"/>
-                    </path>
+                        <circle stroke-opacity=".25" cx="18" cy="18" r="18"/>
+                        <path class="spinner-path" d="M36 18c0-9.94-8.06-18-18-18" />
                     </g>
                 </g>
             </svg>
         </div>
         <div id="vid-player-container" class="hidden">
-            <div id="vid-loader" class="hidden">
+            <div id="vid-spinner" class="hidden">
                 <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" stroke="white">
                     <g fill="none" fill-rule="evenodd">
                         <g transform="translate(2 2)" stroke-width="4">
-                        <circle stroke-opacity=".25" cx="18" cy="18" r="18"/>
-                        <path d="M36 18c0-9.94-8.06-18-18-18">
-                            <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite"/>
-                        </path>
+                            <circle stroke-opacity=".25" cx="18" cy="18" r="18"/>
+                            <path class="spinner-path" d="M36 18c0-9.94-8.06-18-18-18" />
                         </g>
                     </g>
                 </svg>
             </div>
-            <iframe id="vid-player" title="Video player" allowfullscreen frameborder="0"></iframe>
+            <iframe 
+                id="vid-player" 
+                title="Video player" 
+                allowfullscreen 
+                frameborder="0" 
+                sandbox="allow-scripts allow-presentation allow-same-origin"
+            ></iframe>
         </div>
         <h2 id="vid-title" class="hidden" ></h2>
         <div id="controls-container" class="hidden">
@@ -209,10 +227,11 @@
     </main>
     <script>
         const loadBtn = document.getElementById("load-btn");
+        const recentSelect = document.getElementById("recent-select");
         const urlIn = document.getElementById("url-in");
-        const loader = document.getElementById("loader");
+        const spinner = document.getElementById("spinner");
         const vidPlayerCont = document.getElementById("vid-player-container");
-        const vidLoader = document.getElementById("vid-loader");
+        const vidLoader = document.getElementById("vid-spinner");
         const vidPlayer = document.getElementById("vid-player");
         const vidTitle = document.getElementById("vid-title");
         const serversContainer = document.getElementById("servers-container");
@@ -230,6 +249,7 @@
             urlIn.disabled = true;
             vidLoader.classList.remove("hidden");
             vidPlayer.classList.add("hidden");
+            vidPlayer.removeAttribute("src");
 
             localStorage.setItem("server", server);
             localStorage.setItem(`${urlIn.value}-ep`, ep);
@@ -250,20 +270,56 @@
             });
         }
 
+        function getRecents() {
+            const stored = localStorage.getItem("recents");
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function updateRecents(recents, updateLocalStoarge = true) {
+            if (updateLocalStoarge) localStorage.setItem("recents", JSON.stringify(recents));
+
+            while (recentSelect.lastChild.id !== "recent-select-lbl") {
+                recentSelect.removeChild(recentSelect.lastChild);
+            }
+            recents.forEach(r => {
+                const opt = document.createElement("option");
+                opt.setAttribute("value", r.title);
+                opt.innerText = r.title;
+
+                recentSelect.appendChild(opt);
+            });
+        }
+        
+        function addToRecents(title, url) {
+            let recents = getRecents();
+            recents = recents.filter(r => r.title !== title);
+            recents.unshift({ title, url });
+
+            if (recents.length > 16) recents.splice(16);
+
+            updateRecents(recents);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            updateRecents(getRecents(), false);
+        });
+
         loadBtn.addEventListener("click", evt => {
             if (loading) return;
             loading = true;
 
             loadBtn.disabled = true;
             urlIn.disabled = true;
-            loader.classList.remove("hidden");
+            spinner.classList.remove("hidden");
             vidRelElements.forEach(ele => ele.classList.add("hidden"));
 
-            fetch(`./api/info?url=${encodeURIComponent(urlIn.value)}`).then(res => res.json()).then(res => {
+            const url = urlIn.value;
+
+            fetch(`./api/info?url=${encodeURIComponent(url)}`).then(res => res.json()).then(res => {
                 const info = JSON.parse(res);
 
                 const storedServer = parseInt(localStorage.getItem("server"));
-                const storedEp = parseInt(localStorage.getItem(`${urlIn.value}-ep`));
+                const storedEp = parseInt(localStorage.getItem(`${fastHash(info.title)}-ep`));
 
                 server = (storedServer && info.servers.includes(storedServer)) ? storedServer : info.servers[0];
                 ep = (storedEp && info.episodes.includes(storedEp)) ? storedEp : info.episodes[0];
@@ -273,6 +329,8 @@
                 episodesContainer.innerHTML = info.episodes.map(e => `<button data-type="ep" data-id="${e}" ${e == ep && "class=\"active\""}>${e}</button>`).join("");
 
                 vidRelElements.forEach(ele => ele.classList.remove("hidden"));
+
+                addToRecents(info.title, url);
             }).catch(e => {
                 server, ep = -1, -1;
 
@@ -280,15 +338,15 @@
             }).finally(() => {
                 loadBtn.disabled = false;
                 urlIn.disabled = false;
-                loader.classList.add("hidden");
+                spinner.classList.add("hidden");
 
                 loading = false;
                 reloadVid();
             });
         });
 
-        document.addEventListener('click', evt => {
-            const btn = evt.target.closest('button');
+        document.addEventListener("click", evt => {
+            const btn = evt.target.closest("button");
             if (!btn) return;
 
             const { type, id } = btn.dataset;
@@ -296,15 +354,29 @@
             if (type && id) {
                 if (type === "server") {
                     server = parseInt(id);
-                    serversContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    serversContainer.querySelectorAll("button").forEach(b => b.classList.remove("active"));
                     btn.classList.add("active");
                 } else if (type === "ep") {
                     ep = parseInt(id);
-                    episodesContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    episodesContainer.querySelectorAll("button").forEach(b => b.classList.remove("active"));
                     btn.classList.add("active");
                 }
                 reloadVid();
             }
+        });
+
+        recentSelect.addEventListener("change", () => {
+            const selected = recentSelect.value;
+
+            const _done = getRecents().some(r => {
+                if (r.title === selected) {
+                    urlIn.value = r.url;
+                    return true;
+                }
+                return false;
+            })
+
+            recentSelect.selectedIndex = 0;
         });
     </script>
 </body>

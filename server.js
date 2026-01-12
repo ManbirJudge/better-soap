@@ -1,5 +1,6 @@
-import * as cheerio from 'cheerio';
-import express from "express";
+const path = require("path");
+const cheerio = require("cheerio");
+const express = require("express");
 
 const playUrlRe = /plyURL\s*=\s*["']([^"']+)["']/;
 
@@ -31,10 +32,11 @@ async function genHash(string, location) {
 const app = express();
 const port = process.env.PORT || 8080;
 
-app.set("view engine", "ejs");
+app.use(express.static("public"));
+// app.set("view engine", "ejs");
 
 app.get("/", (req, res) => {
-    res.render("index");
+    res.sendFile(path.join(__dirname, "pages/index.html"));
 });
 
 app.get("/api/info", (req, res) => {
@@ -47,10 +49,10 @@ app.get("/api/info", (req, res) => {
         const $ = cheerio.load(body);
 
         $("#eps-list").find("button").each((i, btn) => {
-            episodes.push(parseInt($(btn).attr('id').replace("ep-", "")));
+            episodes.push(parseInt($(btn).attr("id").replace("ep-", "")));
         });
         $("#srv-list").find("button").each((i, btn) => {
-            servers.push(parseInt($(btn).attr('id').replace("srv-", "")));
+            servers.push(parseInt($(btn).attr("id").replace("srv-", "")));
         });
 
         episodes.sort((a, b) => a - b);
