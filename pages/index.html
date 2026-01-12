@@ -166,6 +166,7 @@
     <script>
         let server = -1;
         let ep = -1;
+        let title = "";
         let loading = false;
         let loadingVid = false;
 
@@ -252,7 +253,7 @@
             vidPlayer.removeAttribute("src");
 
             localStorage.setItem("server", server);
-            localStorage.setItem(`${fastHash(info.title)}-ep`, ep);
+            localStorage.setItem(`${fastHash(title)}-ep`, ep);
 
             fetch(`./api/iframe?url=${encodeURIComponent(urlIn.value)}&server=${server}&ep=${ep}`).then(res => res.json()).then(res => {
                 const json = JSON.parse(res);
@@ -323,6 +324,7 @@
 
                 server = (storedServer && info.servers.includes(storedServer)) ? storedServer : info.servers[0];
                 ep = (storedEp && info.episodes.includes(storedEp)) ? storedEp : info.episodes[0];
+                title = info.title;
 
                 vidTitle.innerText = info.title;
                 serversContainer.innerHTML = info.servers.map(srv => `<button data-type="server" data-id="${srv}" ${server == srv && "class=\"active\""}>Server ${srv}</button>`).join("");
@@ -333,6 +335,7 @@
                 addToRecents(info.title, url);
             }).catch(e => {
                 server, ep = -1, -1;
+                title = "";
 
                 console.log("Error:", e);
             }).finally(() => {
