@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="A better version of Soap2DayHDZ.">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="manifest" href="/manifest.json">
     <title>BetterSoap</title>
     <style>
         body, html {
@@ -214,8 +215,7 @@
                 id="vid-player" 
                 title="Video player" 
                 allowfullscreen 
-                frameborder="0" 
-                sandbox="allow-scripts allow-presentation allow-same-origin"
+                frameborder="0"
             ></iframe>
         </div>
         <h2 id="vid-title" class="hidden" ></h2>
@@ -252,7 +252,7 @@
             vidPlayer.removeAttribute("src");
 
             localStorage.setItem("server", server);
-            localStorage.setItem(`${urlIn.value}-ep`, ep);
+            localStorage.setItem(`${fastHash(info.title)}-ep`, ep);
 
             fetch(`./api/iframe?url=${encodeURIComponent(urlIn.value)}&server=${server}&ep=${ep}`).then(res => res.json()).then(res => {
                 const json = JSON.parse(res);
